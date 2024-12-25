@@ -1,10 +1,11 @@
 pipeline {
     agent any 
     tools {
-        // Note: this should match with the tool name configured in your Jenkins instance (JENKINS_URL/configureTools/)
+        // Note: this should match with the tool name configured in your jenkins instance (JENKINS_URL/configureTools/)
         maven "MVN_HOME"
+        
     }
-    environment {
+	 environment {
         // This can be nexus3 or nexus2
         NEXUS_VERSION = "nexus3"
         // This can be http or https
@@ -21,7 +22,7 @@ pipeline {
             steps {
                 script {
                     // Let's clone the source
-                    git 'https://github.com/Reddy-jevaje/spring3-mvc-maven-xml-hello-world-1.git'
+                    git 'https://github.com/Reddy-jevaje/spring3-mvc-maven-xml-hello-world-1.git';
                 }
             }
         }
@@ -37,51 +38,41 @@ pipeline {
         stage("publish to nexus") {
             steps {
                 script {
-                    // Ensure the Pipeline Utility Steps plugin is installed for readMavenPom to work
-                    try {
-                        // Read POM xml file using 'readMavenPom' step
-                        def pom = readMavenPom file: 'pom.xml'
-                        
-                        // Find built artifact under target folder
-                        def filesByGlob = findFiles(glob: "target/*.${pom.packaging}")
-                        
-                        // Print some info from the artifact found
-                        echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
-                        
-                        // Extract the path from the File found
-                        def artifactPath = filesByGlob[0].path
-                        
-                        // Check if the artifact exists
-                        def artifactExists = fileExists artifactPath
-                        
-                        if (artifactExists) {
-                            echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version: ${BUILD_NUMBER}"
-                            
-                            // Upload the artifact to Nexus
-                            nexusArtifactUploader(
-                                nexusVersion: NEXUS_VERSION,
-                                protocol: NEXUS_PROTOCOL,
-                                nexusUrl: NEXUS_URL,
-                                groupId: pom.groupId,
-                                version: "${BUILD_NUMBER}",
-                                repository: NEXUS_REPOSITORY,
-                                credentialsId: NEXUS_CREDENTIAL_ID,
-                                artifacts: [
-                                    [artifactId: pom.artifactId,
-                                     classifier: '',
-                                     file: artifactPath,
-                                     type: pom.packaging],
-                                    [artifactId: pom.artifactId,
-                                     classifier: '',
-                                     file: 'pom.xml',
-                                     type: 'pom']
-                                ]
-                            )
-                        } else {
-                            error "*** File: ${artifactPath}, could not be found"
-                        }
-                    } catch (Exception e) {
-                        error "Error reading the POM file: ${e.message}"
+                    // Read POM xml file using 'readMavenPom' step , this step 'readMavenPom' is included in: https://plugins.jenkins.io/pipeline-utility-steps
+                    pom = readMavenPom file: "pom.xml";
+                    // Find built artifact under target folder
+                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
+                    // Print some info from the artifact found
+                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+                    // Extract the path from the File found
+                    artifactPath = filesByGlob[0].path;
+                    // Assign to a boolean response verifying If the artifact name exists
+                    artifactExists = fileExists artifactPath;
+                    if(artifactExists) {
+                        echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version $BUILD_NUMBER}";
+                        nexusArtifactUploader(
+                            nexusVersion: NEXUS_VERSION,
+                            protocol: NEXUS_PROTOCOL,
+                            nexusUrl: NEXUS_URL,
+			    groupId: pom.groupId,
+                            version: '${BUILD_NUMBER}',
+                            repository: NEXUS_REPOSITORY,
+                            credentialsId: NEXUS_CREDENTIAL_ID,
+                            artifacts: [
+                                // Artifact generated such as .jar, .ear and .war files.
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: artifactPath,
+                                type: pom.packaging],
+                                // Lets upload the pom.xml file for additional information for Transitive dependencies
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: "pom.xml",
+                                type: "pom"]
+                            ]
+                        );
+                    } else {
+                        error "*** File: ${artifactPath}, could not be found";
                     }
                 }
             }
